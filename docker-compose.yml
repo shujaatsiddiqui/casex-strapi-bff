@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: casex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: casex_db
+      POSTGRES_USER: casex
+      POSTGRES_PASSWORD: casex
+    ports:
+      - "5432:5432"
+    volumes:
+      - casex-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  casex-postgres-data:
