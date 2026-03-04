@@ -1,0 +1,23 @@
+<div class="image-gallery">
+  @if (data.Title) {
+    <div class="gallery-header">
+      <h2>{{ data.Title }}</h2>
+    </div>
+  }
+  @if (galleryImages.length) {
+    <div class="gallery-grid">
+      @for (image of galleryImages; track image.id) {
+        <div class="gallery-card">
+          <img
+            [src]="getImageUrl(image.url)"
+            [alt]="image.alternativeText || image.name || ''"
+            loading="lazy"
+          />
+          @if (image.alternativeText || image.name) {
+            <span class="gallery-caption">{{ image.alternativeText || image.name }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

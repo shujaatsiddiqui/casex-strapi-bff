@@ -21,3 +21,12 @@ coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Claude Code project state (AI assistant internal files)
+.claude/
+
+# Binary design documents — store in SharePoint/Teams instead
+*.docx
+*.xlsx
+*.pptx
+*.zip

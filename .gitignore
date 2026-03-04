@@ -416,3 +416,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Stray Node lock files at repo root
+package-lock.json
+
+# Claude Code project state
+.claude/

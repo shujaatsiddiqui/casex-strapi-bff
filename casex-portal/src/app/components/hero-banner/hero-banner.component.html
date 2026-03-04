@@ -1,0 +1,29 @@
+<section class="hero">
+  @if (bannerImageUrl) {
+    <div class="hero-image-wrapper">
+      <img class="hero-bg-image" [src]="bannerImageUrl" [alt]="data.Banner?.alternativeText || data.MainHeading || ''" />
+    </div>
+  }
+  <div class="hero-content">
+    @if (data.MainHeading) {
+      <h1>{{ data.MainHeading }}</h1>
+    }
+    @if (data.Caption) {
+      <p class="caption">{{ data.Caption }}</p>
+    }
+    @if (data.Description) {
+      <p class="description">{{ data.Description }}</p>
+    }
+    <div class="hero-actions">
+      @if (data.RegisterButtonName) {
+        <a class="btn btn-primary">{{ data.RegisterButtonName }}</a>
+      }
+      @if (data.ButtonLabelBeforeLogin) {
+        <a class="btn btn-primary">{{ data.ButtonLabelBeforeLogin }}</a>
+      }
+      @if (data.FileFormButtonName) {
+        <a class="btn btn-secondary" [href]="data.FileFormButtonLink || '#'">{{ data.FileFormButtonName }}</a>
+      }
+    </div>
+  </div>
+</section>

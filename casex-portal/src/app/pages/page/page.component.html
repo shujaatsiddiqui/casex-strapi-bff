@@ -1,0 +1,13 @@
+@if (page) {
+  <app-dynamic-zone [blocks]="page.dz_section" />
+} @else if (error) {
+  <div class="error">
+    <span>&#9888;</span>
+    <span>{{ error }}</span>
+  </div>
+} @else {
+  <div class="loading">
+    <div class="spinner"></div>
+    <span>Loading content&hellip;</span>
+  </div>
+}
