@@ -15,41 +15,106 @@ import { UnknownBlockComponent } from '../unknown-block/unknown-block.component'
  *   1. Create the Angular component (e.g. TestimonialComponent)
  *   2. Add one line here:  'sections.testimonial': TestimonialComponent
  *   DynamicZoneComponent itself never needs to change.
+ *
+ * Set group: 'nav' on any entry whose blocks should be grouped into a
+ * horizontal flex nav bar when they appear consecutively in a zone.
  */
-const BLOCK_REGISTRY: Record<string, Type<unknown>> = {
+interface RegistryEntry {
+  component: Type<unknown>;
+  group?: string;
+}
+
+const BLOCK_REGISTRY: Record<string, RegistryEntry> = {
   // ── Header components ──────────────────────────────────
-  'banner.banner':            HeroBannerComponent,
-  'menu.menu':                MenuItemComponent,
+  'banner.banner':          { component: HeroBannerComponent },
+  'menu.menu':              { component: MenuItemComponent, group: 'nav' },
 
   // ── Body components ────────────────────────────────────
-  'gallery.gallery':          ImageGalleryComponent,
-  'sections.rich-text':       RichTextComponent,
+  'gallery.gallery':        { component: ImageGalleryComponent },
+  'sections.rich-text':     { component: RichTextComponent },
 
   // ── Footer components ──────────────────────────────────
-  'footer.footer':            FooterComponent,
+  'footer.footer':          { component: FooterComponent },
 
   // ── Legacy component names (kept for backward compat) ──
-  'sections.hero-banner':     HeroBannerComponent,
-  'sections.image-gallery':   ImageGalleryComponent,
+  'sections.hero-banner':   { component: HeroBannerComponent },
+  'sections.image-gallery': { component: ImageGalleryComponent },
 };
+
+interface RenderGroup {
+  navGroup: string | null;
+  blocks: DynamicBlock[];
+}
 
 @Component({
   selector: 'app-dynamic-zone',
   standalone: true,
   imports: [NgComponentOutlet],
   template: `
-    @for (block of blocks; track block.id) {
-      <ng-container
-        [ngComponentOutlet]="resolve(block.__component)"
-        [ngComponentOutletInputs]="{ data: block }">
-      </ng-container>
+    @for (group of renderGroups; track $index) {
+      @if (group.navGroup) {
+        <nav class="nav-bar" role="navigation">
+          @for (block of group.blocks; track block.id) {
+            <ng-container
+              [ngComponentOutlet]="resolveComponent(block.__component)"
+              [ngComponentOutletInputs]="{ data: block }">
+            </ng-container>
+          }
+        </nav>
+      } @else {
+        @for (block of group.blocks; track block.id) {
+          <ng-container
+            [ngComponentOutlet]="resolveComponent(block.__component)"
+            [ngComponentOutletInputs]="{ data: block }">
+          </ng-container>
+        }
+      }
     }
   `,
+  styles: [`
+    .nav-bar {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+  `],
 })
 export class DynamicZoneComponent {
   @Input() blocks: DynamicBlock[] = [];
 
-  resolve(type: string): Type<unknown> {
-    return BLOCK_REGISTRY[type] ?? UnknownBlockComponent;
+  get renderGroups(): RenderGroup[] {
+    // Pre-collect all blocks that belong to a named group
+    const groupedBlocks = new Map<string, DynamicBlock[]>();
+    for (const block of this.blocks) {
+      const g = BLOCK_REGISTRY[block.__component]?.group;
+      if (g) {
+        if (!groupedBlocks.has(g)) groupedBlocks.set(g, []);
+        groupedBlocks.get(g)!.push(block);
+      }
+    }
+
+    // Build render list in document order.
+    // When the first block of a named group is encountered, emit the full group.
+    // Subsequent blocks of that group are skipped (already emitted).
+    const emitted = new Set<string>();
+    const groups: RenderGroup[] = [];
+    for (const block of this.blocks) {
+      const navGroup = BLOCK_REGISTRY[block.__component]?.group ?? null;
+      if (navGroup) {
+        if (!emitted.has(navGroup)) {
+          groups.push({ navGroup, blocks: groupedBlocks.get(navGroup)! });
+          emitted.add(navGroup);
+        }
+      } else {
+        groups.push({ navGroup: null, blocks: [block] });
+      }
+    }
+    return groups;
+  }
+
+  resolveComponent(type: string): Type<unknown> {
+    return BLOCK_REGISTRY[type]?.component ?? UnknownBlockComponent;
   }
 }
