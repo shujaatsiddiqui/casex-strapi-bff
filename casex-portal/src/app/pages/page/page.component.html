@@ -1,5 +1,15 @@
 @if (page) {
-  <app-dynamic-zone [blocks]="page.dz_section" />
+  <header class="page-header">
+    <app-dynamic-zone [blocks]="page.dz_header ?? []" />
+  </header>
+
+  <main class="page-body">
+    <app-dynamic-zone [blocks]="page.dz_body ?? []" />
+  </main>
+
+  <footer class="page-footer">
+    <app-dynamic-zone [blocks]="page.dz_footer ?? []" />
+  </footer>
 } @else if (error) {
   <div class="error">
     <span>&#9888;</span>

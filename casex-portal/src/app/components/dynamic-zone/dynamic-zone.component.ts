@@ -1,58 +1,55 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Type } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
 import { DynamicBlock } from '../../services/content.service';
 import { HeroBannerComponent } from '../hero-banner/hero-banner.component';
-import { RichTextComponent } from '../rich-text/rich-text.component';
+import { MenuItemComponent } from '../menu-item/menu-item.component';
 import { ImageGalleryComponent } from '../image-gallery/image-gallery.component';
+import { RichTextComponent } from '../rich-text/rich-text.component';
+import { FooterComponent } from '../footer/footer.component';
+import { UnknownBlockComponent } from '../unknown-block/unknown-block.component';
+
+/**
+ * BLOCK_REGISTRY — maps every Strapi __component string to its Angular component.
+ *
+ * To support a new Strapi component type:
+ *   1. Create the Angular component (e.g. TestimonialComponent)
+ *   2. Add one line here:  'sections.testimonial': TestimonialComponent
+ *   DynamicZoneComponent itself never needs to change.
+ */
+const BLOCK_REGISTRY: Record<string, Type<unknown>> = {
+  // ── Header components ──────────────────────────────────
+  'banner.banner':            HeroBannerComponent,
+  'menu.menu':                MenuItemComponent,
+
+  // ── Body components ────────────────────────────────────
+  'gallery.gallery':          ImageGalleryComponent,
+  'sections.rich-text':       RichTextComponent,
+
+  // ── Footer components ──────────────────────────────────
+  'footer.footer':            FooterComponent,
+
+  // ── Legacy component names (kept for backward compat) ──
+  'sections.hero-banner':     HeroBannerComponent,
+  'sections.image-gallery':   ImageGalleryComponent,
+};
 
 @Component({
   selector: 'app-dynamic-zone',
   standalone: true,
-  imports: [HeroBannerComponent, RichTextComponent, ImageGalleryComponent],
+  imports: [NgComponentOutlet],
   template: `
     @for (block of blocks; track block.id) {
-      @switch (block.__component) {
-        @case ('banner.banner') {
-          <app-hero-banner [data]="block" />
-        }
-        @case ('gallery.gallery') {
-          <app-image-gallery [data]="block" />
-        }
-        @case ('menu.menu') {
-          @if (block.Active) {
-            <nav class="nav-item">
-              <a class="nav-link" [href]="block.Path">{{ block.Name }}</a>
-              @if (block.SubMenu?.length) {
-                <ul class="submenu">
-                  @for (sub of block.SubMenu; track sub.id) {
-                    @if (sub.Active) {
-                      <li><a [href]="sub.Path">{{ sub.Name }}</a></li>
-                    }
-                  }
-                </ul>
-              }
-            </nav>
-          }
-        }
-        @case ('sections.hero-banner') {
-          <app-hero-banner [data]="block" />
-        }
-        @case ('sections.rich-text') {
-          <app-rich-text [data]="block" />
-        }
-        @case ('sections.image-gallery') {
-          <app-image-gallery [data]="block" />
-        }
-      }
+      <ng-container
+        [ngComponentOutlet]="resolve(block.__component)"
+        [ngComponentOutletInputs]="{ data: block }">
+      </ng-container>
     }
   `,
-  styles: [`
-    .nav-item { position: relative; display: inline-block; }
-    .nav-link { color: #1a1a2e; text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; display: block; }
-    .submenu { list-style: none; margin: 0; padding: 0.5rem 0; background: white; border: 1px solid #eee; border-radius: 4px; min-width: 160px; }
-    .submenu li a { display: block; padding: 0.4rem 1rem; color: #333; text-decoration: none; }
-    .submenu li a:hover { background: #f5f5f5; }
-  `],
 })
 export class DynamicZoneComponent {
   @Input() blocks: DynamicBlock[] = [];
+
+  resolve(type: string): Type<unknown> {
+    return BLOCK_REGISTRY[type] ?? UnknownBlockComponent;
+  }
 }

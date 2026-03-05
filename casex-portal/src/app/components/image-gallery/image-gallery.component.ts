@@ -1,10 +1,11 @@
 import { Component, Input, OnChanges } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { DynamicBlock, StrapiMedia } from '../../services/content.service';
-import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-image-gallery',
   standalone: true,
+  imports: [NgOptimizedImage],
   templateUrl: './image-gallery.component.html',
   styles: [`
     /* ── Section wrapper ── */
@@ -104,11 +105,5 @@ export class ImageGalleryComponent implements OnChanges {
 
   ngOnChanges(): void {
     this.galleryImages = this.data?.media_gallery ?? this.data?.Images ?? [];
-  }
-
-  getImageUrl(url: string): string {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `${environment.strapiUrl}${url}`;
   }
 }

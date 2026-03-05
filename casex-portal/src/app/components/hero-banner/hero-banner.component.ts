@@ -1,10 +1,11 @@
 import { Component, Input, OnChanges } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { DynamicBlock } from '../../services/content.service';
-import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-hero-banner',
   standalone: true,
+  imports: [NgOptimizedImage],
   templateUrl: './hero-banner.component.html',
   styles: [`
     /* ── Hero shell ── */
@@ -142,14 +143,9 @@ import { environment } from '../../../environments/environment';
 })
 export class HeroBannerComponent implements OnChanges {
   @Input() data!: DynamicBlock;
-  bannerImageUrl: string | null = null;
+  bannerImageSrc: string | null = null;
 
   ngOnChanges(): void {
-    const url = this.data?.Banner?.url;
-    if (url) {
-      this.bannerImageUrl = url.startsWith('http') ? url : `${environment.strapiUrl}${url}`;
-    } else {
-      this.bannerImageUrl = null;
-    }
+    this.bannerImageSrc = this.data?.Banner?.url ?? null;
   }
 }

@@ -1,0 +1,32 @@
+@if (page) {
+  <header class="page-header">
+    <app-dynamic-zone [blocks]="page.dz_header ?? []" />
+  </header>
+
+  @defer (on viewport) {
+    <main class="page-body">
+      <app-dynamic-zone [blocks]="page.dz_body ?? []" />
+    </main>
+  } @placeholder {
+    <div class="page-body body-placeholder"></div>
+  }
+
+  @defer (on viewport) {
+    <footer class="page-footer">
+      <app-dynamic-zone [blocks]="page.dz_footer ?? []" />
+    </footer>
+  } @placeholder {
+    <div class="footer-placeholder"></div>
+  }
+
+} @else if (error) {
+  <div class="error">
+    <span>&#9888;</span>
+    <span>{{ error }}</span>
+  </div>
+} @else {
+  <div class="loading">
+    <div class="spinner"></div>
+    <span>Loading content&hellip;</span>
+  </div>
+}

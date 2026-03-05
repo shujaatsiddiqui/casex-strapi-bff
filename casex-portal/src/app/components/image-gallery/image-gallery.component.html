@@ -9,7 +9,9 @@
       @for (image of galleryImages; track image.id) {
         <div class="gallery-card">
           <img
-            [src]="getImageUrl(image.url)"
+            [ngSrc]="image.url"
+            [width]="image.width || 400"
+            [height]="image.height || 300"
             [alt]="image.alternativeText || image.name || ''"
             loading="lazy"
           />

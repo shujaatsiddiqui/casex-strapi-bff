@@ -1,7 +1,13 @@
 <section class="hero">
-  @if (bannerImageUrl) {
+  @if (bannerImageSrc) {
     <div class="hero-image-wrapper">
-      <img class="hero-bg-image" [src]="bannerImageUrl" [alt]="data.Banner?.alternativeText || data.MainHeading || ''" />
+      <img
+        [ngSrc]="bannerImageSrc"
+        fill
+        priority
+        [alt]="data.Banner?.alternativeText || data.MainHeading || ''"
+        style="object-fit: cover; object-position: center; opacity: 0.35;"
+      />
     </div>
   }
   <div class="hero-content">

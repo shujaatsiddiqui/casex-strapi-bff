@@ -2,13 +2,11 @@ import { Component, OnInit, inject } from '@angular/core';
 import { ContentService, PageData } from '../../services/content.service';
 import { DynamicZoneComponent } from '../../components/dynamic-zone/dynamic-zone.component';
 
-const HOME_PAGE_DOC_ID = 'cp5vo8z23lk9d4xp2oailb7t';
-
 @Component({
-  selector: 'app-page',
+  selector: 'app-index-page',
   standalone: true,
   imports: [DynamicZoneComponent],
-  templateUrl: './page.component.html',
+  templateUrl: './index-page.component.html',
   styles: [`
     /* ── Page layout ── */
     .page-header { width: 100%; }
@@ -18,6 +16,10 @@ const HOME_PAGE_DOC_ID = 'cp5vo8z23lk9d4xp2oailb7t';
       background: var(--color-primary-dark);
       color: rgba(255,255,255,.85);
     }
+
+    /* ── @defer placeholders ── */
+    .body-placeholder  { min-height: 40vh; background: var(--color-surface); }
+    .footer-placeholder { height: 80px; background: var(--color-primary-dark); }
 
     /* ── Loading state ── */
     .loading {
@@ -55,13 +57,13 @@ const HOME_PAGE_DOC_ID = 'cp5vo8z23lk9d4xp2oailb7t';
     }
   `],
 })
-export class PageComponent implements OnInit {
+export class IndexPageComponent implements OnInit {
   private contentService = inject(ContentService);
   page: PageData | null = null;
   error: string | null = null;
 
   ngOnInit() {
-    this.contentService.getPage(HOME_PAGE_DOC_ID).subscribe({
+    this.contentService.getIndexPage().subscribe({
       next: (data) => (this.page = data),
       error: (err) => {
         this.error = err.message || 'Failed to load page content';

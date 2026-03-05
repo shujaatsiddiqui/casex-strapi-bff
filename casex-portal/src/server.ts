@@ -28,8 +28,9 @@ app.use(
 app.use(
   '/**',
   createNodeRequestHandler(async (req, res, next) => {
-    // Cache-Control for Azure CDN: serve fresh for 60s, stale-while-revalidate for 30s
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    // Cache-Control: CDN edge caches for 60s, serves stale for 10min while revalidating.
+    // Browser does not cache (s-maxage is CDN-only; max-age omitted so browser always revalidates).
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=30');
 
     const response = await angularApp.handle(req, {
       server: 'express',

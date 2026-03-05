@@ -11,6 +11,8 @@ export interface StrapiMedia {
   name: string;
   alternativeText: string | null;
   url: string;
+  width: number;
+  height: number;
   formats?: {
     large?: { url: string; width: number; height: number };
     medium?: { url: string; width: number; height: number };
@@ -37,6 +39,8 @@ export interface DynamicBlock {
   Banner?: StrapiMedia;
   // gallery.gallery
   media_gallery?: StrapiMedia[];
+  // footer.footer
+  footerText?: string;
   // sections.hero-banner (legacy)
   ButtonLabelBeforeLogin?: string;
   // sections.image-gallery / sections.rich-text (legacy)
@@ -50,12 +54,38 @@ export interface PageData {
   id: number;
   documentId: string;
   Title: string;
-  dz_section: DynamicBlock[];
+  dz_header?: DynamicBlock[];
+  dz_body?: DynamicBlock[];
+  dz_footer?: DynamicBlock[];
+  /** @deprecated use dz_header / dz_body / dz_footer */
+  dz_section?: DynamicBlock[];
 }
 
-const DEMO_HOME_POPULATE =
-  'populate[dz_section][on][banner.banner][populate]=*' +
-  '&populate[dz_section][on][gallery.gallery][populate]=*';
+/**
+ * Populate query for all 3 named zones.
+ * When you add a new Strapi component, add its populate entry here:
+ *   'populate[dz_body][on][sections.testimonial][populate]=*'
+ */
+const DEMO_HOME_POPULATE = [
+  // Header zone
+  'populate[dz_header][on][banner.banner][populate]=*',
+  // Body zone
+  'populate[dz_body][on][gallery.gallery][populate]=*',
+  'populate[dz_body][on][sections.rich-text][populate]=*',
+  // Footer zone
+  'populate[dz_footer][on][footer.links-column][populate]=*',
+  'populate[dz_footer][on][footer.contact-info][populate]=*',
+  'populate[dz_footer][on][footer.social-links][populate]=*',
+  'populate[dz_footer][on][footer.copyright][populate]=*',
+].join('&');
+
+const INDEX_PAGE_POPULATE = [
+  'populate[dz_header][on][banner.banner][populate]=*',
+  'populate[dz_header][on][menu.menu][populate][SubMenu][populate]=*',
+  'populate[dz_header][on][submenu.sub-menu][populate]=*',
+  'populate[dz_body][on][gallery.gallery][populate]=*',
+  'populate[dz_footer][on][footer.footer][populate]=*',
+].join('&');
 
 @Injectable({ providedIn: 'root' })
 export class ContentService {
@@ -75,6 +105,27 @@ export class ContentService {
 
     return this.http
       .get<{ data: PageData[] }>(`${this.baseUrl}/api/demo-home-pages?${DEMO_HOME_POPULATE}`)
+      .pipe(
+        map((res) => res.data[0]),
+        tap((data) => {
+          if (isPlatformServer(this.platformId)) {
+            this.transferState.set(key, data);
+          }
+        })
+      );
+  }
+
+  getIndexPage(): Observable<PageData> {
+    const key = makeStateKey<PageData>('index-page');
+
+    if (this.transferState.hasKey(key)) {
+      const cached = this.transferState.get(key, null)!;
+      this.transferState.remove(key);
+      return of(cached);
+    }
+
+    return this.http
+      .get<{ data: PageData[] }>(`${this.baseUrl}/api/index-pages?${INDEX_PAGE_POPULATE}`)
       .pipe(
         map((res) => res.data[0]),
         tap((data) => {
