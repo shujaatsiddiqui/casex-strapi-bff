@@ -50,36 +50,8 @@ interface RenderGroup {
   selector: 'app-dynamic-zone',
   standalone: true,
   imports: [NgComponentOutlet],
-  template: `
-    @for (group of renderGroups; track $index) {
-      @if (group.navGroup) {
-        <nav class="nav-bar" role="navigation">
-          @for (block of group.blocks; track block.id) {
-            <ng-container
-              [ngComponentOutlet]="resolveComponent(block.__component)"
-              [ngComponentOutletInputs]="{ data: block }">
-            </ng-container>
-          }
-        </nav>
-      } @else {
-        @for (block of group.blocks; track block.id) {
-          <ng-container
-            [ngComponentOutlet]="resolveComponent(block.__component)"
-            [ngComponentOutletInputs]="{ data: block }">
-          </ng-container>
-        }
-      }
-    }
-  `,
-  styles: [`
-    .nav-bar {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 0.25rem;
-      flex-wrap: wrap;
-    }
-  `],
+  templateUrl: './dynamic-zone.component.html',
+  styleUrl: './dynamic-zone.component.css',
 })
 export class DynamicZoneComponent {
   @Input() blocks: DynamicBlock[] = [];

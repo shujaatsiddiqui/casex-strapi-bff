@@ -1,0 +1,17 @@
+@if (data.Active !== false) {
+  <nav class="nav-item" [class.has-submenu]="hasSubmenu">
+    <a class="nav-link" [href]="data.Path || '#'">{{ data.Name }}</a>
+
+    @if (hasSubmenu) {
+      <ul class="submenu">
+        @for (sub of data.SubMenu; track sub.id) {
+          @if (sub.Active !== false) {
+            <li>
+              <a class="submenu-link" [href]="sub.Path || '#'">{{ sub.Name }}</a>
+            </li>
+          }
+        }
+      </ul>
+    }
+  </nav>
+}

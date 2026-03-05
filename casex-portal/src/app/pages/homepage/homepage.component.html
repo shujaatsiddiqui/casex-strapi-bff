@@ -1,0 +1,7 @@
+@if (homepage) {
+  <app-dynamic-zone [blocks]="homepage.dynamic_component" />
+} @else if (error) {
+  <p class="error">{{ error }}</p>
+} @else {
+  <p class="loading">Loading...</p>
+}

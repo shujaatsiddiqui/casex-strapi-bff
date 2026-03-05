@@ -6,19 +6,8 @@ import { DynamicZoneComponent } from '../../components/dynamic-zone/dynamic-zone
   selector: 'app-homepage',
   standalone: true,
   imports: [DynamicZoneComponent],
-  template: `
-    @if (homepage) {
-      <app-dynamic-zone [blocks]="homepage.dynamic_component" />
-    } @else if (error) {
-      <p class="error">{{ error }}</p>
-    } @else {
-      <p class="loading">Loading...</p>
-    }
-  `,
-  styles: [`
-    .loading { text-align: center; padding: 4rem; color: #888; }
-    .error { color: #991b1b; padding: 2rem; }
-  `],
+  templateUrl: './homepage.component.html',
+  styleUrl: './homepage.component.css',
 })
 export class HomepageComponent implements OnInit {
   private strapiService = inject(StrapiService);
