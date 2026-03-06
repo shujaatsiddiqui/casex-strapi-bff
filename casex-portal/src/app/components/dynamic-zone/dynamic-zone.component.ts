@@ -1,6 +1,6 @@
 import { Component, Input, Type } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
-import { DynamicBlock } from '../../services/content.service';
+import type { DynamicBlock } from '../../models/strapi.models';
 import { HeroBannerComponent } from '../hero-banner/hero-banner.component';
 import { MenuItemComponent } from '../menu-item/menu-item.component';
 import { ImageGalleryComponent } from '../image-gallery/image-gallery.component';

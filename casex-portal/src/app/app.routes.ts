@@ -4,5 +4,6 @@ import { IndexPageComponent } from './pages/index-page/index-page.component';
 
 export const routes: Routes = [
   { path: '', component: IndexPageComponent },
+  { path: 'Index', component: IndexPageComponent },
   { path: 'demo', component: PageComponent },
 ];

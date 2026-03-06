@@ -1,71 +1,25 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { Observable, of, forkJoin } from 'rxjs';
+import { map, tap, switchMap, shareReplay } from 'rxjs/operators';
 import { isPlatformServer } from '@angular/common';
 import { makeStateKey, TransferState } from '@angular/core';
 import { environment } from '../../environments/environment';
+import { DynamicBlock, PageData } from '../models/strapi.models';
+import {
+  CollectionSchemaResponse,
+  ComponentSchemaResponse,
+  QueryConfig,
+  StrapiAttribute,
+} from '../models/strapi-schema.types';
 
-export interface StrapiMedia {
-  id: number;
-  name: string;
-  alternativeText: string | null;
-  url: string;
-  width: number;
-  height: number;
-  formats?: {
-    large?: { url: string; width: number; height: number };
-    medium?: { url: string; width: number; height: number };
-    small?: { url: string; width: number; height: number };
-    thumbnail?: { url: string; width: number; height: number };
-  };
-}
+export type { StrapiMedia, DynamicBlock, PageData } from '../models/strapi.models';
 
-export interface DynamicBlock {
-  __component: string;
-  id: number;
-  // menu.menu
-  Active?: boolean;
-  Path?: string;
-  Name?: string;
-  SubMenu?: DynamicBlock[];
-  // banner.banner
-  MainHeading?: string;
-  Caption?: string;
-  Description?: string;
-  RegisterButtonName?: string;
-  FileFormButtonName?: string;
-  FileFormButtonLink?: string;
-  Banner?: StrapiMedia;
-  // gallery.gallery
-  media_gallery?: StrapiMedia[];
-  // footer.footer
-  footerText?: string;
-  // sections.hero-banner (legacy)
-  ButtonLabelBeforeLogin?: string;
-  // sections.image-gallery / sections.rich-text (legacy)
-  Title?: string;
-  Images?: StrapiMedia[];
-  Content?: any[];
-  [key: string]: any;
-}
-
-export interface PageData {
-  id: number;
-  documentId: string;
-  Title: string;
-  /**
-   * All dynamic zones found in the Strapi response, keyed by field name.
-   * Populated automatically by extractZones() — no hardcoded zone names needed.
-   * Example: { dz_header: [...], dz_body: [...], dz_footer: [...] }
-   */
-  zones: Record<string, DynamicBlock[]>;
-}
+// ── Helper ─────────────────────────────────────────────────────────────────
 
 /**
  * Scans a raw Strapi page object and collects every field that is a
- * dynamic zone (an array whose items each have a __component string).
- * This makes rendering independent of zone count and zone names.
+ * dynamic zone (array whose items each carry a __component string).
  */
 function extractZones(raw: Record<string, unknown>): Record<string, DynamicBlock[]> {
   const zones: Record<string, DynamicBlock[]> = {};
@@ -77,32 +31,7 @@ function extractZones(raw: Record<string, unknown>): Record<string, DynamicBlock
   return zones;
 }
 
-/**
- * Populate query for all 3 named zones.
- * When you add a new Strapi component, add its populate entry here:
- *   'populate[dz_body][on][sections.testimonial][populate]=*'
- */
-const DEMO_HOME_POPULATE = [
-  // Header zone
-  'populate[dz_header][on][banner.banner][populate]=*',
-  // Body zone
-  'populate[dz_body][on][gallery.gallery][populate]=*',
-  'populate[dz_body][on][sections.rich-text][populate]=*',
-  // Footer zone
-  'populate[dz_footer][on][footer.links-column][populate]=*',
-  'populate[dz_footer][on][footer.contact-info][populate]=*',
-  'populate[dz_footer][on][footer.social-links][populate]=*',
-  'populate[dz_footer][on][footer.copyright][populate]=*',
-].join('&');
-
-const INDEX_PAGE_POPULATE = [
-  'populate[dz_header][on][banner.banner][populate]=*',
-  'populate[dz_header][on][menu.menu][populate][SubMenu][populate]=*',
-  'populate[dz_header][on][submenu.sub-menu][populate]=*',
-  'populate[dz_body][on][gallery.gallery][populate]=*',
-  'populate[dz_footer][on][footer.footer][populate]=*',
-  'populate[dz_footer_02][on][footer.footer][populate]=*',
-].join('&');
+// ── Service ────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
 export class ContentService {
@@ -110,9 +39,208 @@ export class ContentService {
   private transferState = inject(TransferState);
   private platformId = inject(PLATFORM_ID);
   private baseUrl = environment.strapiUrl;
+  private adminToken = environment.strapiAdminToken;
 
-  getPage(_documentId: string): Observable<PageData> {
-    const key = makeStateKey<PageData>('demo-home-page');
+  /** Per-process cache: collectionUid → QueryConfig observable */
+  private queryConfigCache = new Map<string, Observable<QueryConfig>>();
+
+  // ── Schema API calls ────────────────────────────────────────────────────
+
+  private get authHeaders() {
+    return { Authorization: `Bearer ${this.adminToken}` };
+  }
+
+  private fetchCollectionSchema(uid: string): Observable<CollectionSchemaResponse> {
+    return this.http.get<CollectionSchemaResponse>(
+      `${this.baseUrl}/api/content-type-builder/content-types/${uid}`,
+      { headers: this.authHeaders }
+    );
+  }
+
+  private fetchComponentSchema(uid: string): Observable<ComponentSchemaResponse> {
+    return this.http.get<ComponentSchemaResponse>(
+      `${this.baseUrl}/api/content-type-builder/components/${uid}`,
+      { headers: this.authHeaders }
+    );
+  }
+
+  // ── BFS component schema loader ─────────────────────────────────────────
+
+  /**
+   * Fetches all component schemas reachable from `initialUids` via BFS.
+   * Discovers nested component UIDs in each fetched schema and queues them.
+   * Returns a Map of uid → schema for every component in the graph.
+   */
+  private fetchAllComponentSchemas(
+    initialUids: string[]
+  ): Observable<Map<string, ComponentSchemaResponse>> {
+    const allSchemas = new Map<string, ComponentSchemaResponse>();
+
+    const fetchBatch = (uids: string[]): Observable<Map<string, ComponentSchemaResponse>> => {
+      const toFetch = uids.filter((uid) => !allSchemas.has(uid));
+      if (toFetch.length === 0) return of(allSchemas);
+
+      return forkJoin(
+        Object.fromEntries(toFetch.map((uid) => [uid, this.fetchComponentSchema(uid)]))
+      ).pipe(
+        switchMap((batch) => {
+          for (const [uid, schema] of Object.entries(batch)) {
+            allSchemas.set(uid, schema as ComponentSchemaResponse);
+          }
+
+          // Queue any nested component UIDs found inside the fetched schemas
+          const nextUids: string[] = [];
+          for (const schema of Object.values(batch) as ComponentSchemaResponse[]) {
+            for (const attr of Object.values(schema.data.schema.attributes)) {
+              if (attr.type === 'component' && attr.component && !allSchemas.has(attr.component)) {
+                nextUids.push(attr.component);
+              }
+            }
+          }
+
+          return fetchBatch(nextUids);
+        })
+      );
+    };
+
+    return fetchBatch(initialUids);
+  }
+
+  // ── Populate query builder ──────────────────────────────────────────────
+
+  /**
+   * Recursively builds populate params for a component's attributes.
+   *
+   * Rules:
+   *  - component field  → recurse with prefix[populate][fieldName]
+   *  - relation field   → add prefix[populate][fieldName][populate]=*
+   *  - media / scalars  → handled by leaf fallback
+   *  - no params added  → add prefix[populate]=* (leaf: media & plain scalars)
+   *
+   * `visited` prevents infinite loops on circular component references.
+   */
+  private buildComponentParams(
+    attributes: Record<string, StrapiAttribute>,
+    prefix: string,
+    allSchemas: Map<string, ComponentSchemaResponse>,
+    visited: Set<string>
+  ): string[] {
+    const params: string[] = [];
+
+    for (const [fieldName, attr] of Object.entries(attributes)) {
+      if (attr.type === 'component' && attr.component && !visited.has(attr.component)) {
+        const compSchema = allSchemas.get(attr.component);
+        if (compSchema) {
+          const newVisited = new Set(visited);
+          newVisited.add(attr.component);
+          params.push(
+            ...this.buildComponentParams(
+              compSchema.data.schema.attributes,
+              `${prefix}[populate][${fieldName}]`,
+              allSchemas,
+              newVisited
+            )
+          );
+        }
+      } else if (attr.type === 'relation') {
+        params.push(`${prefix}[populate][${fieldName}][populate]=*`);
+      }
+    }
+
+    // Leaf node: no component/relation fields → wildcard populate covers media & scalars
+    if (params.length === 0) {
+      params.push(`${prefix}[populate]=*`);
+    }
+
+    return params;
+  }
+
+  /**
+   * Builds the full list of populate params for all dynamic zones in a collection.
+   */
+  private buildZoneParams(
+    collectionAttrs: Record<string, StrapiAttribute>,
+    allSchemas: Map<string, ComponentSchemaResponse>
+  ): string[] {
+    const params: string[] = [];
+
+    for (const [fieldName, attr] of Object.entries(collectionAttrs)) {
+      if (attr.type === 'dynamiczone' && attr.components) {
+        for (const compUid of attr.components) {
+          const compSchema = allSchemas.get(compUid);
+          if (compSchema) {
+            params.push(
+              ...this.buildComponentParams(
+                compSchema.data.schema.attributes,
+                `populate[${fieldName}][on][${compUid}]`,
+                allSchemas,
+                new Set([compUid])
+              )
+            );
+          }
+        }
+      }
+    }
+
+    return params;
+  }
+
+  // ── Query config orchestrator ───────────────────────────────────────────
+
+  /**
+   * Generates the full QueryConfig for a collection:
+   *  1. Fetch collection schema → pluralName + attributes
+   *  2. BFS-fetch all component schemas referenced in dynamic zones
+   *  3. Recursively build populate query
+   *  4. Return { apiPath, populate }
+   *
+   * Cached per collectionUid for the lifetime of this service instance.
+   */
+  private buildQueryConfig(collectionUid: string): Observable<QueryConfig> {
+    if (this.queryConfigCache.has(collectionUid)) {
+      return this.queryConfigCache.get(collectionUid)!;
+    }
+
+    const obs$ = this.fetchCollectionSchema(collectionUid).pipe(
+      switchMap((collectionSchema) => {
+        const { pluralName } = collectionSchema.data.schema;
+        const attrs = collectionSchema.data.schema.attributes;
+
+        const initialUids = [
+          ...new Set(
+            Object.values(attrs)
+              .filter((a) => a.type === 'dynamiczone' && a.components)
+              .flatMap((a) => a.components!)
+          ),
+        ];
+
+        if (initialUids.length === 0) {
+          return of<QueryConfig>({ apiPath: `/api/${pluralName}`, populate: '' });
+        }
+
+        return this.fetchAllComponentSchemas(initialUids).pipe(
+          map((allSchemas) => ({
+            apiPath: `/api/${pluralName}`,
+            populate: this.buildZoneParams(attrs, allSchemas).join('&'),
+          }))
+        );
+      }),
+      shareReplay(1)
+    );
+
+    this.queryConfigCache.set(collectionUid, obs$);
+    return obs$;
+  }
+
+  // ── Generic page fetcher ────────────────────────────────────────────────
+
+  /**
+   * Fetches a page for any Strapi collection.
+   * Derives the REST endpoint and populate query from the live schema.
+   * Handles TransferState for SSR → browser hydration.
+   */
+  private fetchPageData(collectionUid: string, cacheKey: string): Observable<PageData> {
+    const key = makeStateKey<PageData>(cacheKey);
 
     if (this.transferState.hasKey(key)) {
       const cached = this.transferState.get(key, null)!;
@@ -120,43 +248,37 @@ export class ContentService {
       return of(cached);
     }
 
-    return this.http
-      .get<{ data: Record<string, unknown>[] }>(`${this.baseUrl}/api/demo-home-pages?${DEMO_HOME_POPULATE}`)
-      .pipe(
-        map((res) => {
-          const raw = res.data[0];
-          return { id: raw['id'], documentId: raw['documentId'], Title: raw['Title'], zones: extractZones(raw) } as PageData;
-        }),
-        tap((data) => {
-          if (isPlatformServer(this.platformId)) {
-            this.transferState.set(key, data);
-          }
-        })
-      );
+    return this.buildQueryConfig(collectionUid).pipe(
+      switchMap(({ apiPath, populate }) =>
+        this.http.get<{ data: Record<string, unknown>[] }>(
+          `${this.baseUrl}${apiPath}${populate ? '?' + populate : ''}`
+        )
+      ),
+      map((res) => {
+        const raw = res.data[0];
+        return {
+          id: raw['id'],
+          documentId: raw['documentId'],
+          Title: raw['Title'],
+          zones: extractZones(raw),
+        } as PageData;
+      }),
+      tap((data) => {
+        if (isPlatformServer(this.platformId)) {
+          this.transferState.set(key, data);
+        }
+      })
+    );
+  }
+
+  // ── Public API ──────────────────────────────────────────────────────────
+
+  getPage(_documentId: string): Observable<PageData> {
+    return this.fetchPageData('api::demo-home-page.demo-home-page', 'demo-home-page');
   }
 
   getIndexPage(): Observable<PageData> {
-    const key = makeStateKey<PageData>('index-page');
-
-    if (this.transferState.hasKey(key)) {
-      const cached = this.transferState.get(key, null)!;
-      this.transferState.remove(key);
-      return of(cached);
-    }
-
-    return this.http
-      .get<{ data: Record<string, unknown>[] }>(`${this.baseUrl}/api/index-pages?${INDEX_PAGE_POPULATE}`)
-      .pipe(
-        map((res) => {
-          const raw = res.data[0];
-          return { id: raw['id'], documentId: raw['documentId'], Title: raw['Title'], zones: extractZones(raw) } as PageData;
-        }),
-        tap((data) => {
-          if (isPlatformServer(this.platformId)) {
-            this.transferState.set(key, data);
-          }
-        })
-      );
+    return this.fetchPageData('api::index-page.index-page', 'index-page');
   }
 
   getImageUrl(url: string): string {

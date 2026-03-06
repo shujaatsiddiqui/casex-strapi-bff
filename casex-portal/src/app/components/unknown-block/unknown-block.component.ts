@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { DynamicBlock } from '../../services/content.service';
+import type { DynamicBlock } from '../../models/strapi.models';
 import { environment } from '../../../environments/environment';
 
 @Component({

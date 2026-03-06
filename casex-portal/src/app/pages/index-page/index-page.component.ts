@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { ContentService, PageData } from '../../services/content.service';
+import { ContentService } from '../../services/content.service';
+import type { PageData } from '../../models/strapi.models';
 import { DynamicZoneComponent } from '../../components/dynamic-zone/dynamic-zone.component';
 
 @Component({

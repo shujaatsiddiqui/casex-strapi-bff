@@ -1,6 +1,6 @@
 import { Component, Input, OnChanges } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
-import { DynamicBlock } from '../../services/content.service';
+import type { DynamicBlock } from '../../models/strapi.models';
 
 @Component({
   selector: 'app-hero-banner',

@@ -1,6 +1,6 @@
 import { Component, Input, OnChanges } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
-import { DynamicBlock, StrapiMedia } from '../../services/content.service';
+import type { DynamicBlock, StrapiMedia } from '../../models/strapi.models';
 
 @Component({
   selector: 'app-image-gallery',
