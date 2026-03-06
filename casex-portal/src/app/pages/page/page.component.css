@@ -1,10 +1,10 @@
-/* ── Page layout ── */
-.page-header { width: 100%; }
-.page-body   { width: 100%; min-height: 40vh; }
-.page-footer {
-  width: 100%;
+/* ── Zone wrapper ── */
+.page-zone { width: 100%; }
+
+/* Convention: any zone whose name contains "footer" gets the dark footer style */
+.page-zone[data-zone*="footer"] {
   background: var(--color-primary-dark);
-  color: rgba(255,255,255,.85);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* ── Loading state ── */

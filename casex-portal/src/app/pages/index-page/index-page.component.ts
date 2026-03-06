@@ -14,6 +14,11 @@ export class IndexPageComponent implements OnInit {
   page: PageData | null = null;
   error: string | null = null;
 
+  get pageZones() {
+    if (!this.page) return [];
+    return Object.entries(this.page.zones).map(([name, blocks]) => ({ name, blocks }));
+  }
+
   ngOnInit() {
     this.contentService.getIndexPage().subscribe({
       next: (data) => (this.page = data),

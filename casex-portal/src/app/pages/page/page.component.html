@@ -1,15 +1,9 @@
 @if (page) {
-  <header class="page-header">
-    <app-dynamic-zone [blocks]="page.dz_header ?? []" />
-  </header>
-
-  <main class="page-body">
-    <app-dynamic-zone [blocks]="page.dz_body ?? []" />
-  </main>
-
-  <footer class="page-footer">
-    <app-dynamic-zone [blocks]="page.dz_footer ?? []" />
-  </footer>
+  @for (zone of pageZones; track zone.name) {
+    <section class="page-zone" [attr.data-zone]="zone.name">
+      <app-dynamic-zone [blocks]="zone.blocks" />
+    </section>
+  }
 } @else if (error) {
   <div class="error">
     <span>&#9888;</span>

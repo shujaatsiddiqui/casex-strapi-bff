@@ -54,11 +54,27 @@ export interface PageData {
   id: number;
   documentId: string;
   Title: string;
-  dz_header?: DynamicBlock[];
-  dz_body?: DynamicBlock[];
-  dz_footer?: DynamicBlock[];
-  /** @deprecated use dz_header / dz_body / dz_footer */
-  dz_section?: DynamicBlock[];
+  /**
+   * All dynamic zones found in the Strapi response, keyed by field name.
+   * Populated automatically by extractZones() — no hardcoded zone names needed.
+   * Example: { dz_header: [...], dz_body: [...], dz_footer: [...] }
+   */
+  zones: Record<string, DynamicBlock[]>;
+}
+
+/**
+ * Scans a raw Strapi page object and collects every field that is a
+ * dynamic zone (an array whose items each have a __component string).
+ * This makes rendering independent of zone count and zone names.
+ */
+function extractZones(raw: Record<string, unknown>): Record<string, DynamicBlock[]> {
+  const zones: Record<string, DynamicBlock[]> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (Array.isArray(value) && value.length > 0 && typeof value[0]?.__component === 'string') {
+      zones[key] = value as DynamicBlock[];
+    }
+  }
+  return zones;
 }
 
 /**
@@ -85,6 +101,7 @@ const INDEX_PAGE_POPULATE = [
   'populate[dz_header][on][submenu.sub-menu][populate]=*',
   'populate[dz_body][on][gallery.gallery][populate]=*',
   'populate[dz_footer][on][footer.footer][populate]=*',
+  'populate[dz_footer_02][on][footer.footer][populate]=*',
 ].join('&');
 
 @Injectable({ providedIn: 'root' })
@@ -104,9 +121,12 @@ export class ContentService {
     }
 
     return this.http
-      .get<{ data: PageData[] }>(`${this.baseUrl}/api/demo-home-pages?${DEMO_HOME_POPULATE}`)
+      .get<{ data: Record<string, unknown>[] }>(`${this.baseUrl}/api/demo-home-pages?${DEMO_HOME_POPULATE}`)
       .pipe(
-        map((res) => res.data[0]),
+        map((res) => {
+          const raw = res.data[0];
+          return { id: raw['id'], documentId: raw['documentId'], Title: raw['Title'], zones: extractZones(raw) } as PageData;
+        }),
         tap((data) => {
           if (isPlatformServer(this.platformId)) {
             this.transferState.set(key, data);
@@ -125,9 +145,12 @@ export class ContentService {
     }
 
     return this.http
-      .get<{ data: PageData[] }>(`${this.baseUrl}/api/index-pages?${INDEX_PAGE_POPULATE}`)
+      .get<{ data: Record<string, unknown>[] }>(`${this.baseUrl}/api/index-pages?${INDEX_PAGE_POPULATE}`)
       .pipe(
-        map((res) => res.data[0]),
+        map((res) => {
+          const raw = res.data[0];
+          return { id: raw['id'], documentId: raw['documentId'], Title: raw['Title'], zones: extractZones(raw) } as PageData;
+        }),
         tap((data) => {
           if (isPlatformServer(this.platformId)) {
             this.transferState.set(key, data);
